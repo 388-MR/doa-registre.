@@ -1,0 +1,160 @@
+// Organization Relations Service
+import supabase from '../lib/supabase';
+
+export const RELATION_TYPES = [
+  { value: 'alliee', label: 'Alliée', color: '#22c55e' },
+  { value: 'alliee_occasionnelle', label: 'Alliée occasionnelle', color: '#86efac' },
+  { value: 'neutre', label: 'Neutre', color: '#6b7280' },
+  { value: 'potentielle_guerre', label: 'Potentielle future guerre', color: '#f97316' },
+  { value: 'ennemie', label: 'Ennemie', color: '#ef4444' },
+] as const;
+
+export interface OrganizationRelation {
+  id: string;
+  organization_a_id: string;
+  organization_b_id: string;
+  relation_type: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  organization_a?: { id: string; name: string; color: string | null; logo_url: string | null };
+  organization_b?: { id: string; name: string; color: string | null; logo_url: string | null };
+}
+
+export interface RelationInput {
+  organization_a_id: string;
+  organization_b_id: string;
+  relation_type: string;
+  notes?: string;
+}
+
+const STORAGE_KEY = 'doa_org_relations_v1';
+
+// Get all relations involving a specific organization
+export async function getOrganizationRelations(orgId: string): Promise<OrganizationRelation[]> {
+  try {
+    const { data, error } = await supabase
+      .from('organization_relations')
+      .select(`
+        *,
+        organization_a:organizations!organization_a_id(id, name, color, logo_url),
+        organization_b:organizations!organization_b_id(id, name, color, logo_url)
+      `)
+      .or(`organization_a_id.eq.${orgId},organization_b_id.eq.${orgId}`);
+    if (error) throw error;
+    return data || [];
+  } catch {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const all: OrganizationRelation[] = JSON.parse(stored);
+      return all.filter(r => r.organization_a_id === orgId || r.organization_b_id === orgId);
+    }
+    return [];
+  }
+}
+
+// Get all relations
+export async function getAllRelations(): Promise<OrganizationRelation[]> {
+  try {
+    const { data, error } = await supabase
+      .from('organization_relations')
+      .select(`
+        *,
+        organization_a:organizations!organization_a_id(id, name, color, logo_url),
+        organization_b:organizations!organization_b_id(id, name, color, logo_url)
+      `)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  } catch {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) return JSON.parse(stored);
+    return [];
+  }
+}
+
+// Create a relation (bidirectional)
+export async function createRelation(input: RelationInput): Promise<OrganizationRelation> {
+  // Ensure consistent ordering (alphabetically by ID to prevent duplicates)
+  const [orgA, orgB] = [input.organization_a_id, input.organization_b_id].sort();
+
+  try {
+    const { data, error } = await supabase
+      .from('organization_relations')
+      .insert({
+        organization_a_id: orgA,
+        organization_b_id: orgB,
+        relation_type: input.relation_type,
+        notes: input.notes || null,
+      })
+      .select(`
+        *,
+        organization_a:organizations!organization_a_id(id, name, color, logo_url),
+        organization_b:organizations!organization_b_id(id, name, color, logo_url)
+      `)
+      .single();
+    if (error) throw error;
+    return data;
+  } catch {
+    const relations = await getAllRelations();
+    const newRelation: OrganizationRelation = {
+      id: `rel-${Date.now()}`,
+      organization_a_id: orgA,
+      organization_b_id: orgB,
+      relation_type: input.relation_type,
+      notes: input.notes || null,
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    relations.unshift(newRelation);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(relations));
+    return newRelation;
+  }
+}
+
+// Update a relation
+export async function updateRelation(id: string, input: Partial<RelationInput>): Promise<OrganizationRelation | null> {
+  try {
+    const { data, error } = await supabase
+      .from('organization_relations')
+      .update({ ...input, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select(`
+        *,
+        organization_a:organizations!organization_a_id(id, name, color, logo_url),
+        organization_b:organizations!organization_b_id(id, name, color, logo_url)
+      `)
+      .single();
+    if (error) throw error;
+    return data;
+  } catch {
+    const relations = await getAllRelations();
+    const idx = relations.findIndex(r => r.id === id);
+    if (idx === -1) return null;
+    relations[idx] = { ...relations[idx], ...input, updated_at: new Date().toISOString() };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(relations));
+    return relations[idx];
+  }
+}
+
+// Delete a relation
+export async function deleteRelation(id: string): Promise<void> {
+  try {
+    const { error } = await supabase.from('organization_relations').delete().eq('id', id);
+    if (error) throw error;
+  } catch {
+    const relations = await getAllRelations();
+    const filtered = relations.filter(r => r.id !== id);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  }
+}
+
+export function getRelationTypeLabel(type: string): string {
+  return RELATION_TYPES.find(t => t.value === type)?.label || type;
+}
+
+export function getRelationTypeColor(type: string): string {
+  return RELATION_TYPES.find(t => t.value === type)?.color || '#6b7280';
+}
