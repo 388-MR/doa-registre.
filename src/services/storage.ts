@@ -50,24 +50,29 @@ function encodeNotes(informant: Partial<LocalInformant>, existingNotes?: string)
   if (existingNotes) {
     try {
       prior = JSON.parse(existingNotes);
+      // Remove old _ext.reliability_status since it's now a real column
+      if (prior._ext) delete prior._ext.reliability_status;
     } catch {
       prior = {};
     }
   }
+  // Only keep non-reliability extended fields in notes
+  const hasExt = informant.id_card_url || informant.dna_profile || informant.function_type || informant.function_detail;
+  if (!hasExt && Object.keys(prior).length === 0) return '';
   return JSON.stringify({
     ...prior,
     _ext: {
+      ...(prior._ext || {}),
       id_card_url: informant.id_card_url ?? null,
       dna_profile: informant.dna_profile ?? null,
       function_type: informant.function_type ?? null,
       function_detail: informant.function_detail ?? null,
-      reliability_status: informant.reliability_status ?? 'inconnu',
     },
   });
 }
 
-function decodeNotes(raw: string | null): Pick<LocalInformant, 'id_card_url' | 'dna_profile' | 'function_type' | 'function_detail' | 'reliability_status'> {
-  if (!raw) return { id_card_url: null, dna_profile: null, function_type: null, function_detail: null, reliability_status: 'inconnu' };
+function decodeNotes(raw: string | null): Pick<LocalInformant, 'id_card_url' | 'dna_profile' | 'function_type' | 'function_detail'> {
+  if (!raw) return { id_card_url: null, dna_profile: null, function_type: null, function_detail: null };
   try {
     const parsed = JSON.parse(raw);
     const ext = parsed._ext || parsed;
@@ -76,10 +81,9 @@ function decodeNotes(raw: string | null): Pick<LocalInformant, 'id_card_url' | '
       dna_profile: ext.dna_profile ?? null,
       function_type: ext.function_type ?? null,
       function_detail: ext.function_detail ?? null,
-      reliability_status: ext.reliability_status ?? 'inconnu',
     };
   } catch {
-    return { id_card_url: null, dna_profile: null, function_type: null, function_detail: null, reliability_status: 'inconnu' };
+    return { id_card_url: null, dna_profile: null, function_type: null, function_detail: null };
   }
 }
 
@@ -92,6 +96,7 @@ function rowToLocal(row: Record<string, unknown>): LocalInformant {
     first_name: (row.first_name as string | null) ?? null,
     last_name: (row.last_name as string | null) ?? null,
     phone: (row.phone as string | null) ?? null,
+    reliability_status: (row.reliability_status as 'fiable' | 'non_fiable' | 'inconnu') ?? 'inconnu',
     created_at: (row.created_at as string) || new Date().toISOString(),
     updated_at: (row.updated_at as string) || new Date().toISOString(),
     ...ext,
@@ -151,6 +156,7 @@ export async function createLocalInformant(input: Omit<LocalInformant, 'id' | 'c
         last_name: input.last_name,
         phone: input.phone,
         notes: encodeNotes(input),
+        reliability_status: input.reliability_status || 'inconnu',
         status: 'active',
       })
       .select('*')
@@ -182,6 +188,7 @@ export async function updateLocalInformant(id: string, patch: Partial<Omit<Local
         last_name: patch.last_name,
         phone: patch.phone,
         notes: encodeNotes(patch, existing?.notes ?? null),
+        reliability_status: patch.reliability_status || 'inconnu',
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)

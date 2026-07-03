@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Activity, Filter, Download, Loader2, User, Calendar, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
-import { getLogs, type LogEntry } from '../services/logger';
+import { getLogsAsync, type LogEntry } from '../services/logger';
 
 const ACTION_LABELS: Record<string, string> = {
   create: 'Création',
@@ -58,8 +58,7 @@ export function LogsPage() {
 
   const loadLogsData = () => {
     setLoading(true);
-    setLogs(getLogs());
-    setLoading(false);
+    getLogsAsync().then(data => { setLogs(data); setLoading(false); });
   };
 
   const filteredLogs = logs.filter(log => {

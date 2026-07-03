@@ -21,6 +21,7 @@ import {
   Map,
   Leaf,
   FileBarChart,
+  ShieldCheck,
 } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useAuth } from '../../contexts/AuthContext';
@@ -232,6 +233,7 @@ export function Sidebar({ collapsed, onCollapsedChange }: { collapsed: boolean; 
             )}
             {collapsed && <div className="my-1 mx-2 border-t" style={{ borderColor: '#141922' }} />}
             <NavItem to="/settings" icon={Settings} label="Paramètres" collapsed={collapsed} />
+            {isCommandant && <NavItem to="/agents" icon={ShieldCheck} label="Gestion Agents" collapsed={collapsed} />}
             {canViewLogs && <NavItem to="/logs" icon={Activity} label="Logs" collapsed={collapsed} />}
           </div>
         )}

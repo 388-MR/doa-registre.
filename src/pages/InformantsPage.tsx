@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Target, Plus, Search, Phone, Briefcase, User, Loader2 } from 'lucide-react';
 import { getLocalInformantsAsync, type LocalInformant } from '../services/storage';
+import { AuthorTag } from '../components/ui/AuthorTag';
 
 const FUNCTION_LABELS: Record<string, string> = {
   employee: 'Employé',
@@ -159,9 +160,12 @@ function InformantCard({ informant, onClick }: { informant: LocalInformant; onCl
         </div>
       </div>
       <div className="mt-3 pt-3 border-t border-gray-800/60 flex items-center justify-between">
-        <span className="text-[10px] text-gray-700">
-          {new Date(informant.created_at).toLocaleDateString('fr-FR')}
-        </span>
+        <div className="flex items-center gap-2">
+          <AuthorTag matricule={(informant as Record<string, unknown>).created_by_matricule as string} />
+          <span className="text-[10px] text-gray-700">
+            {new Date(informant.created_at).toLocaleDateString('fr-FR')}
+          </span>
+        </div>
         <span className="text-[10px] text-cyan-700 group-hover:text-cyan-500 transition-colors">
           Consulter →
         </span>

@@ -15,6 +15,8 @@ export interface Permissions {
   role: DoaRole;
   isCommandant: boolean;
   isSuperAdmin: boolean;
+  isReadOnly: boolean;
+  canWrite: boolean;
 }
 
 export function usePermissions(): Permissions {
@@ -38,18 +40,23 @@ export function usePermissions(): Permissions {
 
   const isCommandant = role === 'commandant_doa' || role === 'super_admin';
 
+  const isReadOnly = agent?.is_read_only ?? false;
+  const canWrite = !isReadOnly;
+
   return {
     canRead: true,
-    canCreate: true,
-    canEdit: true,
-    canDelete: isCommandant, // commandant + super_admin
-    canManageUsers: isCommandant, // commandant + super_admin
-    canAccessSettings: isCommandant, // commandant + super_admin
-    canViewLogs: isSuperAdmin || role === 'commandant_doa', // super_admin + commandants
-    canManageThemes: isSuperAdmin, // only super_admin
-    canPromoteUsers: isSuperAdmin, // only super_admin can promote/demote commandants
+    canCreate: canWrite,
+    canEdit: canWrite,
+    canDelete: canWrite && isCommandant,
+    canManageUsers: canWrite && isCommandant,
+    canAccessSettings: canWrite && isCommandant,
+    canViewLogs: isSuperAdmin || role === 'commandant_doa',
+    canManageThemes: isSuperAdmin,
+    canPromoteUsers: isSuperAdmin,
     role,
     isCommandant,
     isSuperAdmin,
+    isReadOnly,
+    canWrite,
   };
 }

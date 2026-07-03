@@ -17,6 +17,19 @@ import {
 } from '../services/storage';
 import { usePermissions } from '../hooks/usePermissions';
 import { useAuth } from '../contexts/AuthContext';
+import { AuthorTag } from '../components/ui/AuthorTag';
+
+const RELIABILITY_COLORS: Record<string, string> = {
+  fiable: '#22c55e',
+  non_fiable: '#ef4444',
+  inconnu: '#6b7280',
+};
+
+const RELIABILITY_LABELS: Record<string, string> = {
+  fiable: 'Fiable',
+  non_fiable: 'Non fiable',
+  inconnu: 'Inconnu',
+};
 
 const FUNCTION_LABELS: Record<string, string> = {
   employee: 'Employé d\'une entreprise',
@@ -142,6 +155,15 @@ export function InformantDetailPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-xl font-bold text-gray-100">{fullName}</h1>
+            <span
+              className="inline-block mt-1 text-[10px] px-2 py-0.5 rounded font-medium"
+              style={{
+                background: `${RELIABILITY_COLORS[informant.reliability_status || 'inconnu']}20`,
+                color: RELIABILITY_COLORS[informant.reliability_status || 'inconnu'],
+              }}
+            >
+              {RELIABILITY_LABELS[informant.reliability_status || 'inconnu']}
+            </span>
             {informant.function_type && (
               <span className="text-xs bg-cyan-900/30 text-cyan-500 px-2 py-0.5 rounded-full">
                 {FUNCTION_LABELS[informant.function_type] ?? informant.function_type}

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import supabase from '../lib/supabase';
 import type { UserRole } from '../types';
 
@@ -9,9 +9,12 @@ export interface Agent {
   role: UserRole;
   doa_role: 'agent_doa' | 'commandant_doa';
   display_name: string | null;
+  code_name: string | null;
   avatar_url: string | null;
   is_active: boolean;
+  is_read_only: boolean;
   last_login: string | null;
+  last_seen: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,10 +49,8 @@ function isValidMatricule(raw: string): number | null {
 }
 
 async function fetchDoaRole(matricule: string): Promise<'agent_doa' | 'commandant_doa'> {
-  // Automatic Commandant DOA for specific matricules
   if (matricule === '400' || matricule === '302') return 'commandant_doa';
 
-  // Check agent_roles table first (preferred)
   try {
     const { data, error } = await supabase
       .from('agent_roles')
@@ -59,7 +60,6 @@ async function fetchDoaRole(matricule: string): Promise<'agent_doa' | 'commandan
     if (!error && data?.role) return data.role as 'agent_doa' | 'commandant_doa';
   } catch { /* table may not exist */ }
 
-  // Fallback: check agents table (admin → commandant_doa)
   try {
     const { data } = await supabase
       .from('agents')
@@ -67,15 +67,6 @@ async function fetchDoaRole(matricule: string): Promise<'agent_doa' | 'commandan
       .ilike('matricule', matricule)
       .maybeSingle();
     if (data?.role === 'admin') return 'commandant_doa';
-  } catch { /* ignore */ }
-
-  // localStorage fallback
-  try {
-    const stored = localStorage.getItem('doa_roles');
-    if (stored) {
-      const roles = JSON.parse(stored) as Record<string, string>;
-      if (roles[matricule] === 'commandant_doa') return 'commandant_doa';
-    }
   } catch { /* ignore */ }
 
   return 'agent_doa';
@@ -89,9 +80,12 @@ function buildSessionAgent(matriculeNum: number, doaRole: 'agent_doa' | 'command
     role: 'agent',
     doa_role: doaRole,
     display_name: doaRole === 'commandant_doa' ? `Commandant N°${matriculeNum}` : `Agent N°${matriculeNum}`,
+    code_name: null,
     avatar_url: null,
     is_active: true,
+    is_read_only: false,
     last_login: new Date().toISOString(),
+    last_seen: new Date().toISOString(),
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -100,10 +94,20 @@ function buildSessionAgent(matriculeNum: number, doaRole: 'agent_doa' | 'command
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [agent, setAgent] = useState<Agent | null>(getStoredAgent);
   const [isLoading, setIsLoading] = useState(false);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const saveAgent = useCallback((a: Agent) => {
     setAgent(a);
     localStorage.setItem(SESSION_KEY, JSON.stringify({ agent: a }));
+  }, []);
+
+  const updatePresence = useCallback(async (matricule: string) => {
+    try {
+      await supabase
+        .from('agents')
+        .update({ last_seen: new Date().toISOString() })
+        .ilike('matricule', matricule);
+    } catch { /* ignore */ }
   }, []);
 
   const login = useCallback(async (matricule: string, pin: string) => {
@@ -111,7 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const cleanMatricule = matricule.trim();
 
-      // Try agents table first (for pre-configured accounts)
       const { data: dbAgent } = await supabase
         .from('agents')
         .select('*')
@@ -122,13 +125,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (dbAgent.pin !== pin) { setIsLoading(false); return { error: 'Mot de passe invalide' }; }
         if (!dbAgent.is_active) { setIsLoading(false); return { error: 'Compte désactivé' }; }
         const doaRole = await fetchDoaRole(cleanMatricule);
-        const fullAgent: Agent = { ...dbAgent, doa_role: doaRole };
+        const now = new Date().toISOString();
+        const fullAgent: Agent = {
+          ...dbAgent,
+          doa_role: doaRole,
+          is_read_only: dbAgent.is_read_only ?? false,
+          code_name: dbAgent.code_name ?? null,
+          last_seen: now,
+        };
         saveAgent(fullAgent);
+        // Update last_login and last_seen in DB
+        supabase
+          .from('agents')
+          .update({ last_login: now, last_seen: now })
+          .ilike('matricule', cleanMatricule)
+          .then(() => {});
         setIsLoading(false);
         return { error: null };
       }
 
-      // Accept 301-400 range with fixed password "0507"
       const num = isValidMatricule(cleanMatricule);
       if (num === null) {
         setIsLoading(false);
@@ -139,7 +154,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: 'Mot de passe invalide.' };
       }
       const doaRole = await fetchDoaRole(cleanMatricule);
-      saveAgent(buildSessionAgent(num, doaRole));
+      const sessionAgent = buildSessionAgent(num, doaRole);
+      saveAgent(sessionAgent);
+      // Upsert agent record for presence tracking
+      supabase
+        .from('agents')
+        .upsert({
+          matricule: cleanMatricule,
+          pin: '0507',
+          role: 'agent',
+          last_login: new Date().toISOString(),
+          last_seen: new Date().toISOString(),
+        }, { onConflict: 'matricule' })
+        .then(() => {});
       setIsLoading(false);
       return { error: null };
     } catch {
@@ -156,16 +183,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshAgent = useCallback(async () => {
     if (!agent) return;
-    const doaRole = await fetchDoaRole(agent.matricule);
-    if (doaRole !== agent.doa_role) {
-      saveAgent({ ...agent, doa_role: doaRole });
-    }
+    try {
+      const { data } = await supabase
+        .from('agents')
+        .select('*')
+        .ilike('matricule', agent.matricule)
+        .maybeSingle();
+      const doaRole = await fetchDoaRole(agent.matricule);
+      if (data) {
+        saveAgent({
+          ...agent,
+          ...data,
+          doa_role: doaRole,
+          is_read_only: data.is_read_only ?? false,
+          code_name: data.code_name ?? null,
+        });
+      } else if (doaRole !== agent.doa_role) {
+        saveAgent({ ...agent, doa_role: doaRole });
+      }
+    } catch { /* ignore */ }
   }, [agent, saveAgent]);
 
   const logout = useCallback(async () => {
+    if (agent) {
+      try {
+        await supabase
+          .from('agents')
+          .update({ last_seen: new Date(Date.now() - 5 * 60 * 1000).toISOString() })
+          .ilike('matricule', agent.matricule);
+      } catch { /* ignore */ }
+    }
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
     setAgent(null);
     localStorage.removeItem(SESSION_KEY);
-  }, []);
+  }, [agent]);
+
+  // Heartbeat: update last_seen every 45 seconds while logged in
+  useEffect(() => {
+    if (!agent) {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+      return;
+    }
+    updatePresence(agent.matricule);
+    heartbeatRef.current = setInterval(() => {
+      updatePresence(agent.matricule);
+    }, 45000);
+    return () => {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    };
+  }, [agent, updatePresence]);
+
+  // Update presence on tab visibility change
+  useEffect(() => {
+    if (!agent) return;
+    const onVisible = () => {
+      if (!document.hidden) updatePresence(agent.matricule);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [agent, updatePresence]);
 
   return (
     <AuthContext.Provider value={{ agent, isLoading, isAuthenticated: !!agent, login, logout, refreshAgent }}>

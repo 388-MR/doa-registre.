@@ -3,10 +3,9 @@ import supabase from '../lib/supabase';
 
 export const RELATION_TYPES = [
   { value: 'alliee', label: 'Alliée', color: '#22c55e' },
-  { value: 'alliee_occasionnelle', label: 'Alliée occasionnelle', color: '#86efac' },
-  { value: 'neutre', label: 'Neutre', color: '#6b7280' },
-  { value: 'potentielle_guerre', label: 'Potentielle future guerre', color: '#f97316' },
   { value: 'ennemie', label: 'Ennemie', color: '#ef4444' },
+  { value: 'neutre', label: 'Neutre', color: '#6b7280' },
+  { value: 'inconnu', label: 'Inconnu', color: '#f59e0b' },
 ] as const;
 
 export interface OrganizationRelation {
@@ -76,10 +75,36 @@ export async function getAllRelations(): Promise<OrganizationRelation[]> {
 
 // Create a relation (bidirectional)
 export async function createRelation(input: RelationInput): Promise<OrganizationRelation> {
-  // Ensure consistent ordering (alphabetically by ID to prevent duplicates)
   const [orgA, orgB] = [input.organization_a_id, input.organization_b_id].sort();
 
   try {
+    // Check if a relation already exists between these two organizations
+    const { data: existing } = await supabase
+      .from('organization_relations')
+      .select('id')
+      .or(`and(organization_a_id.eq.${orgA},organization_b_id.eq.${orgB}),and(organization_a_id.eq.${orgB},organization_b_id.eq.${orgA})`)
+      .maybeSingle();
+
+    if (existing) {
+      // Update the existing relation instead of creating a duplicate
+      const { data, error } = await supabase
+        .from('organization_relations')
+        .update({
+          relation_type: input.relation_type,
+          notes: input.notes || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id)
+        .select(`
+          *,
+          organization_a:organizations!organization_a_id(id, name, color, logo_url),
+          organization_b:organizations!organization_b_id(id, name, color, logo_url)
+        `)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
     const { data, error } = await supabase
       .from('organization_relations')
       .insert({
@@ -98,6 +123,17 @@ export async function createRelation(input: RelationInput): Promise<Organization
     return data;
   } catch {
     const relations = await getAllRelations();
+    const existingLocal = relations.find(r =>
+      (r.organization_a_id === orgA && r.organization_b_id === orgB) ||
+      (r.organization_a_id === orgB && r.organization_b_id === orgA)
+    );
+    if (existingLocal) {
+      existingLocal.relation_type = input.relation_type;
+      existingLocal.notes = input.notes || null;
+      existingLocal.updated_at = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(relations));
+      return existingLocal;
+    }
     const newRelation: OrganizationRelation = {
       id: `rel-${Date.now()}`,
       organization_a_id: orgA,

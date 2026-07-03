@@ -1945,6 +1945,7 @@ function RelationsTab({ org }: { org: Organization }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({ organization_id: '', relation_type: 'neutre', notes: '' });
+  const { isReadOnly } = usePermissions();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
 
   useEffect(() => {
@@ -1970,7 +1971,7 @@ function RelationsTab({ org }: { org: Organization }) {
         notes: formData.notes || undefined,
       });
       logCreate('organization_relations', newRel.id, `Relation ${org.name}`, { relation_type: formData.relation_type });
-      setRelations([newRel, ...relations]);
+      await loadRelations();
       setShowForm(false);
       setFormData({ organization_id: '', relation_type: 'neutre', notes: '' });
     } catch (error) {
@@ -1986,7 +1987,7 @@ function RelationsTab({ org }: { org: Organization }) {
     try {
       await deleteRelation(rel.id);
       logDelete('organization_relations', rel.id, 'Relation', {});
-      setRelations(relations.filter(r => r.id !== rel.id));
+      await loadRelations();
     } catch (error) {
       console.error('Failed to delete relation:', error);
       alert('Erreur lors de la suppression: ' + (error as any)?.message || 'Erreur inconnue');
@@ -2002,7 +2003,7 @@ function RelationsTab({ org }: { org: Organization }) {
     <div>
       <div className="flex justify-between items-center mb-3">
         <span className="text-xs text-gray-600">{relations.length} relation{relations.length !== 1 ? 's' : ''}</span>
-        {!showForm && (
+        {!showForm && !isReadOnly && (
           <Btn onClick={() => setShowForm(true)}><Plus className="w-3.5 h-3.5" />Nouvelle relation</Btn>
         )}
       </div>
@@ -2019,7 +2020,10 @@ function RelationsTab({ org }: { org: Organization }) {
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100"
               >
                 <option value="">Sélectionner...</option>
-                {organizations.filter(o => o.id !== org.id).map(o => (
+                {organizations.filter(o => o.id !== org.id && !relations.some(r => {
+                  const otherId = r.organization_a_id === org.id ? r.organization_b_id : r.organization_a_id;
+                  return otherId === o.id;
+                })).map(o => (
                   <option key={o.id} value={o.id}>{o.name}</option>
                 ))}
               </select>
@@ -2095,12 +2099,14 @@ function RelationsTab({ org }: { org: Organization }) {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleDelete(rel)}
-                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => handleDelete(rel)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </div>
             );

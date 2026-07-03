@@ -543,7 +543,7 @@ export function MapPage() {
                     position: 'absolute',
                     left: px,
                     top:  py,
-                    transform: `translate(-50%, -50%) scale(${isHov ? 1.25 : 1})`,
+                    transform: `translate(-50%, -50%) scale(${(isHov ? 1.25 : 1) / viewport.zoom})`,
                     transformOrigin: '50% 50%',
                     transition: 'transform 0.15s ease',
                     cursor: 'pointer',

@@ -31,6 +31,7 @@ import { MapPage } from './pages/MapPage';
 import { PeriodicReportsPage } from './pages/PeriodicReportsPage';
 import { PlantationsPage } from './pages/PlantationsPage';
 import { PlantationDetailPage } from './pages/PlantationDetailPage';
+import { AgentsPage } from './pages/AgentsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -123,6 +124,7 @@ function AppRoutes() {
       <Route path="/search" element={<ProtectedRoute><SearchPage /></ProtectedRoute>} />
       <Route path="/brouillons" element={<ProtectedRoute><BrouillonsPage /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+      <Route path="/agents" element={<ProtectedRoute><AgentsPage /></ProtectedRoute>} />
       <Route path="/wanted" element={<ProtectedRoute><WantedPersonsPage /></ProtectedRoute>} />
       <Route path="/logs" element={<ProtectedRoute><LogsPage /></ProtectedRoute>} />
       <Route path="/map" element={<ProtectedRoute><MapPage /></ProtectedRoute>} />
