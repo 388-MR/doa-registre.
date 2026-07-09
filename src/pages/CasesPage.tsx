@@ -7,6 +7,7 @@ import { Input } from '../components/ui/Input';
 import { Badge, StatusBadge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { LoadingState, EmptyState } from '../components/ui/Empty';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { getCases, closeCase } from '../services/cases';
 import { canEdit } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -139,6 +140,7 @@ export function CasesPage() {
                   )}
                 </div>
               </div>
+              <AuthorFooter createdAt={c.created_at} createdMatricule={c.created_by_matricule} createdCodename={c.created_by_codename} updatedAt={c.updated_at} updatedMatricule={c.updated_by_matricule} updatedCodename={c.updated_by_codename} />
             </Card>
           ))}
         </div>

@@ -4,6 +4,7 @@ import { Building2, Users, Bike, Plus, ChevronRight, Loader2 } from 'lucide-reac
 import { getOrganizations, createOrganization } from '../services/organizations';
 import type { Organization, OrganizationCategory } from '../types';
 import { ThreatBadge } from '../components/ui/Badge';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 
 const CATEGORIES: { id: OrganizationCategory; label: string; icon: typeof Building2; desc: string }[] = [
   { id: 'criminal_org', label: 'Organisations criminelles', icon: Building2, desc: 'Syndicats et réseaux criminels organisés' },
@@ -118,15 +119,18 @@ export function OrganizationsPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {orgs.map(org => (
-                    <Link key={org.id} to={`/organizations/${org.id}`} className="group flex items-center gap-3 px-4 py-3 rounded-xl border border-gray-800/60 bg-gray-900/20 hover:border-gray-700 hover:bg-gray-900/40 transition-all">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: org.color || '#4d6fa8' }}>
-                        {org.name.charAt(0)}
+                    <Link key={org.id} to={`/organizations/${org.id}`} className="group px-4 py-3 rounded-xl border border-gray-800/60 bg-gray-900/20 hover:border-gray-700 hover:bg-gray-900/40 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white flex-shrink-0" style={{ background: org.color || '#4d6fa8' }}>
+                          {org.name.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-gray-200 group-hover:text-gray-100 transition-colors truncate">{org.name}</div>
+                          <ThreatBadge level={org.threat_level} />
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-700 group-hover:text-gray-400 transition-colors flex-shrink-0" />
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-200 group-hover:text-gray-100 transition-colors truncate">{org.name}</div>
-                        <ThreatBadge level={org.threat_level} />
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-gray-700 group-hover:text-gray-400 transition-colors flex-shrink-0" />
+                      <AuthorFooter createdAt={org.created_at} createdMatricule={org.created_by_matricule} createdCodename={org.created_by_codename} updatedAt={org.updated_at} updatedMatricule={org.updated_by_matricule} updatedCodename={org.updated_by_codename} />
                     </Link>
                   ))}
                 </div>

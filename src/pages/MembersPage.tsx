@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserPlus, Search, Filter, AlertTriangle, Eye, MoreVertical, Edit, Trash2 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
@@ -8,6 +8,7 @@ import { Badge, DangerBadge, StatusBadge } from '../components/ui/Badge';
 import { Avatar } from '../components/ui/Avatar';
 import { LoadingState, EmptyState } from '../components/ui/Empty';
 import { ConfirmModal } from '../components/ui/Modal';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { getMembers, deleteMember } from '../services/organizations';
 import { getOrganizations } from '../services/organizations';
 import { canEdit, canDelete } from '../services/auth';
@@ -142,7 +143,8 @@ export function MembersPage() {
             </thead>
             <tbody>
               {filteredMembers.map((member) => (
-                <tr key={member.id} className="border-b border-dark-800 hover:bg-dark-800/50">
+                <Fragment key={member.id}>
+                <tr className="border-b border-dark-800 hover:bg-dark-800/50">
                   <td className="py-3 px-4">
                     <Link to={`/members/${member.id}`} className="flex items-center gap-3 group">
                       <Avatar src={member.photo_url} name={`${member.first_name} ${member.last_name}`} size="md" />
@@ -193,6 +195,12 @@ export function MembersPage() {
                     </div>
                   </td>
                 </tr>
+                <tr>
+                  <td colSpan={7} className="pt-0 pb-3 px-4">
+                    <AuthorFooter createdAt={member.created_at} createdMatricule={member.created_by_matricule} createdCodename={member.created_by_codename} updatedAt={member.updated_at} updatedMatricule={member.updated_by_matricule} updatedCodename={member.updated_by_codename} />
+                  </td>
+                </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

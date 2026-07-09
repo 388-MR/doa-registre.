@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Leaf, Plus, Loader2, MapPin, Eye, Trash2, CheckCircle, Clock, AlertCircle
@@ -8,6 +8,7 @@ import {
   PLANTATION_STATUSES, type Plantation
 } from '../services/plantations';
 import { logCreate, logDelete } from '../services/logger';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 
 export function PlantationsPage() {
   const navigate = useNavigate();
@@ -167,8 +168,8 @@ export function PlantationsPage() {
       ) : (
         <div className="space-y-2">
           {filteredPlantations.map(p => (
+            <Fragment key={p.id}>
             <div
-              key={p.id}
               className="flex items-center gap-4 p-4 rounded-xl border border-gray-800/50 bg-gray-900/20 hover:border-gray-700/50 transition-colors group cursor-pointer"
               onClick={() => navigate(`/plantations/${p.id}`)}
             >
@@ -207,6 +208,8 @@ export function PlantationsPage() {
                 </button>
               </div>
             </div>
+            <AuthorFooter createdAt={p.created_at} updatedAt={p.updated_at} />
+            </Fragment>
           ))}
         </div>
       )}

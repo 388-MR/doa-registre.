@@ -153,6 +153,9 @@ export function getRoleLabel(rank: UserRole): string {
     co_lead: 'Co-Lead DOA',
     agent: 'Agent DOA',
     readonly: 'Lecture seule',
+    commandant_doa: 'Commandant DOA',
+    super_admin: 'Super Admin',
+    agent_doa: 'Agent DOA',
   };
   return labels[rank] || rank;
 }

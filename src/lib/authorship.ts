@@ -1,6 +1,9 @@
 // Centralized authorship tracing — every service uses these helpers
 // so that all create/update operations automatically stamp the
 // matricule + codename of the currently connected agent.
+//
+// The session is set by AuthContext on login/refresh and read from
+// Supabase, never from localStorage. This ensures multi-user correctness.
 
 export interface AuthorStamp {
   created_by_matricule?: string | null;
@@ -9,26 +12,33 @@ export interface AuthorStamp {
   updated_by_codename?: string | null;
 }
 
-function getSession(): { matricule: string | null; codename: string | null } {
-  try {
-    const raw = localStorage.getItem('doa_session_v3');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      const agent = parsed.agent;
-      if (agent) {
-        return {
-          matricule: agent.matricule || null,
-          codename: agent.code_name || agent.display_name || null,
-        };
-      }
-    }
-  } catch { /* ignore */ }
-  return { matricule: null, codename: null };
+interface SessionInfo {
+  matricule: string | null;
+  codename: string | null;
+}
+
+let currentSession: SessionInfo = { matricule: null, codename: null };
+
+/** Called by AuthContext whenever the agent logs in or is refreshed. */
+export function setAuthorshipSession(agent: { matricule: string; code_name: string | null; display_name: string | null } | null): void {
+  if (agent) {
+    currentSession = {
+      matricule: agent.matricule,
+      codename: agent.code_name || agent.display_name || null,
+    };
+  } else {
+    currentSession = { matricule: null, codename: null };
+  }
+}
+
+/** Returns the currently connected agent's matricule + codename. */
+export function getAuthorshipSession(): SessionInfo {
+  return currentSession;
 }
 
 /** Merge into an insert payload to stamp creation author + timestamps. */
 export function stampCreate<T extends Record<string, unknown>>(payload: T): T & AuthorStamp {
-  const { matricule, codename } = getSession();
+  const { matricule, codename } = currentSession;
   const now = new Date().toISOString();
   return {
     ...payload,
@@ -43,7 +53,7 @@ export function stampCreate<T extends Record<string, unknown>>(payload: T): T & 
 
 /** Merge into an update payload to stamp the last editor + timestamp. */
 export function stampUpdate<T extends Record<string, unknown>>(payload: T): T & AuthorStamp {
-  const { matricule, codename } = getSession();
+  const { matricule, codename } = currentSession;
   return {
     ...payload,
     updated_by_matricule: matricule,

@@ -2,7 +2,7 @@
 // ENUMS & TYPES
 // =====================================================
 
-export type UserRole = 'admin' | 'lead' | 'co_lead' | 'agent' | 'readonly';
+export type UserRole = 'admin' | 'lead' | 'co_lead' | 'agent' | 'readonly' | 'commandant_doa' | 'super_admin' | 'agent_doa';
 
 export type OrganizationCategory = 'bikers' | 'criminal_org' | 'gang';
 

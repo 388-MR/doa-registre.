@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { LoadingState, EmptyState } from '../components/ui/Empty';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { getEvidence } from '../services/cases';
 import { canEdit } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';
@@ -129,6 +130,7 @@ export function EvidencePage() {
                   Affaire liée
                 </div>
               )}
+              <AuthorFooter createdAt={e.created_at} createdMatricule={e.created_by_matricule} createdCodename={e.created_by_codename} updatedAt={e.updated_at} updatedMatricule={e.updated_by_matricule} updatedCodename={e.updated_by_codename} />
             </Card>
           ))}
         </div>

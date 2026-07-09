@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Fragment } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Car, Plus, Search, MapPin, User } from 'lucide-react';
 import { Card } from '../components/ui/Card';
@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge, StatusBadge } from '../components/ui/Badge';
 import { LoadingState, EmptyState } from '../components/ui/Empty';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { getVehicles } from '../services/organizations';
 import { getOrganizations } from '../services/organizations';
 import { canEdit } from '../services/auth';
@@ -99,7 +100,8 @@ export function VehiclesPage() {
             </thead>
             <tbody>
               {filtered.map((v) => (
-                <tr key={v.id} className="border-b border-dark-800 hover:bg-dark-800/50 cursor-pointer" onClick={() => navigate(`/vehicles/${v.id}`)}>
+                <Fragment key={v.id}>
+                <tr className="border-b border-dark-800 hover:bg-dark-800/50 cursor-pointer" onClick={() => navigate(`/vehicles/${v.id}`)}>
                   <td className="py-3 px-4 text-gray-100">
                     {v.make} {v.model}
                   </td>
@@ -117,6 +119,12 @@ export function VehiclesPage() {
                   </td>
                   <td className="py-3 px-4"><StatusBadge status={v.status} /></td>
                 </tr>
+                <tr>
+                  <td colSpan={6} className="pt-0 pb-3 px-4">
+                    <AuthorFooter createdAt={v.created_at} createdMatricule={v.created_by_matricule} createdCodename={v.created_by_codename} updatedAt={v.updated_at} updatedMatricule={v.updated_by_matricule} updatedCodename={v.updated_by_codename} />
+                  </td>
+                </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>

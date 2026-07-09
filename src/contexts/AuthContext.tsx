@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react';
 import supabase from '../lib/supabase';
+import { setAuthorshipSession } from '../lib/authorship';
 import type { UserRole } from '../types';
 
 export interface Agent {
@@ -7,7 +8,7 @@ export interface Agent {
   matricule: string;
   pin: string;
   role: UserRole;
-  doa_role: 'agent_doa' | 'commandant_doa';
+  doa_role: DoaRoleType;
   display_name: string | null;
   code_name: string | null;
   avatar_url: string | null;
@@ -48,17 +49,22 @@ function isValidMatricule(raw: string): number | null {
   return null;
 }
 
-async function fetchDoaRole(matricule: string): Promise<'agent_doa' | 'commandant_doa'> {
-  if (matricule === '400' || matricule === '302') return 'commandant_doa';
+export type DoaRoleType = 'agent_doa' | 'commandant_doa' | 'super_admin';
 
+async function fetchDoaRole(matricule: string): Promise<DoaRoleType> {
   try {
     const { data, error } = await supabase
       .from('agent_roles')
       .select('role')
       .eq('matricule', matricule)
       .maybeSingle();
-    if (!error && data?.role) return data.role as 'agent_doa' | 'commandant_doa';
+    if (!error && data?.role) {
+      if (data.role === 'super_admin') return 'super_admin';
+      if (data.role === 'commandant_doa') return 'commandant_doa';
+    }
   } catch { /* table may not exist */ }
+
+  if (matricule === '388') return 'super_admin';
 
   try {
     const { data } = await supabase
@@ -96,9 +102,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // On mount, sync authorship session with any stored agent
+  useEffect(() => {
+    const stored = getStoredAgent();
+    if (stored) {
+      setAuthorshipSession({
+        matricule: stored.matricule,
+        code_name: (stored as Record<string, unknown>).code_name as string | null,
+        display_name: (stored as Record<string, unknown>).display_name as string | null,
+      });
+    }
+  }, []);
+
   const saveAgent = useCallback((a: Agent) => {
     setAgent(a);
     localStorage.setItem(SESSION_KEY, JSON.stringify({ agent: a }));
+    setAuthorshipSession({
+      matricule: a.matricule,
+      code_name: (a as Record<string, unknown>).code_name as string | null,
+      display_name: (a as Record<string, unknown>).display_name as string | null,
+    });
   }, []);
 
   const updatePresence = useCallback(async (matricule: string) => {
@@ -216,6 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       heartbeatRef.current = null;
     }
     setAgent(null);
+    setAuthorshipSession(null);
     localStorage.removeItem(SESSION_KEY);
   }, [agent]);
 

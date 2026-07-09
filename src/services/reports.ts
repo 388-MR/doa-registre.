@@ -1,12 +1,23 @@
-// Periodic Reports Service
+// Periodic Reports Service — builds reports from audit_log data in Supabase.
+// No localStorage, no simulated data. Everything is from the database.
 import supabase from '../lib/supabase';
-import { stampCreate, stampUpdate } from '../lib/authorship';
-import { getOrganization } from './organizations';
+import { stampCreate } from '../lib/authorship';
+import { getAuthorshipSession } from '../lib/authorship';
 
 export const REPORT_TYPES = [
-  { value: 'hebdomadaire', label: 'Hebdomadaire' },
-  { value: 'mensuel', label: 'Mensuel' },
-  { value: 'personnalise', label: 'Personnalisé' },
+  { value: 'agent', label: "Activité d'un agent DOA" },
+  { value: 'organization', label: "Activité d'une organisation" },
+  { value: 'global', label: 'Activité globale' },
+] as const;
+
+export const PERIOD_PRESETS = [
+  { value: 'today', label: "Aujourd'hui" },
+  { value: 'yesterday', label: 'Hier' },
+  { value: 'this_week', label: 'Cette semaine' },
+  { value: 'last_week', label: 'Semaine dernière' },
+  { value: 'this_month', label: 'Ce mois' },
+  { value: 'last_month', label: 'Mois dernier' },
+  { value: 'custom', label: 'Personnalisée' },
 ] as const;
 
 export interface PeriodicReport {
@@ -17,246 +28,287 @@ export interface PeriodicReport {
   content: Record<string, unknown>;
   generated_by: string | null;
   created_at: string;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
 }
 
 export interface ReportContent {
+  report_kind: string;
   period_start: string;
   period_end: string;
   generated_at: string;
-  organizations: {
+  subject_name: string | null;
+  subject_matricule: string | null;
+  actions: {
     id: string;
-    name: string;
-    category: string;
-    total_entries: number;
-    crimes: { crime_type: string; count: number; latest_date: string }[];
-    timeline: { date: string; crime_type: string; report: string | null }[];
+    action: string;
+    action_label: string;
+    entity_type: string;
+    entity_name: string | null;
+    created_at: string;
   }[];
   summary: {
-    total_organizations: number;
-    total_crimes: number;
-    top_crimes: { type: string; count: number }[];
-    most_active_organizations: { name: string; count: number }[];
+    total_actions: number;
+    by_action: { action: string; label: string; count: number }[];
+    by_entity: { entity_type: string; count: number }[];
   };
 }
 
-const STORAGE_KEY = 'doa_periodic_reports_v1';
-const CRIME_JOURNAL_PREFIX = 'doa_crime_journal_v1_';
+export function getPeriodRange(preset: string, customFrom?: string, customTo?: string): { from: string; to: string } {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const to = new Date(today);
+  to.setDate(to.getDate() + 1);
+  const from = new Date(today);
 
-// Get session helper
-function getSessionInfo(): { matricule: string | null; name: string | null } {
-  try {
-    const session = localStorage.getItem('doa_session_v3');
-    if (session) {
-      const parsed = JSON.parse(session);
+  switch (preset) {
+    case 'today':
+      break;
+    case 'yesterday':
+      from.setDate(from.getDate() - 1);
+      to.setDate(to.getDate() - 1);
+      break;
+    case 'this_week': {
+      const day = from.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      from.setDate(from.getDate() + diff);
+      break;
+    }
+    case 'last_week': {
+      const day = from.getDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      from.setDate(from.getDate() + diff - 7);
+      to.setDate(from.getDate() + 7);
+      break;
+    }
+    case 'this_month':
+      from.setDate(1);
+      break;
+    case 'last_month':
+      from.setMonth(from.getMonth() - 1);
+      from.setDate(1);
+      to.setDate(1);
+      break;
+    case 'custom':
       return {
-        matricule: parsed.agent?.matricule || null,
-        name: parsed.agent?.display_name || null,
+        from: customFrom || from.toISOString().split('T')[0],
+        to: customTo || to.toISOString().split('T')[0],
       };
-    }
-  } catch {}
-  return { matricule: null, name: null };
+  }
+  return {
+    from: from.toISOString().split('T')[0],
+    to: to.toISOString().split('T')[0],
+  };
 }
 
-// Get all reports
+function mapActionLabel(action: string): string {
+  const map: Record<string, string> = {
+    create: 'Création',
+    update: 'Modification',
+    delete: 'Suppression',
+    view: 'Consultation',
+    export: 'Export',
+    login: 'Connexion',
+    logout: 'Déconnexion',
+  };
+  return map[action] || action;
+}
+
+function entityLabel(entityType: string): string {
+  const map: Record<string, string> = {
+    organizations: 'Organisation',
+    members: 'Membre',
+    vehicles: 'Véhicule',
+    hideouts: 'Planque',
+    headquarters: 'QG',
+    businesses: 'Business',
+    evidence: 'Preuve',
+    arrests: 'Arrestation',
+    notes: 'Note',
+    cases: 'Dossier',
+    informants: 'Indic',
+    plantations: 'Plantation',
+    map_points: 'Point de carte',
+    surveillance: 'Surveillance',
+    periodic_reports: 'Rapport',
+    organization_relations: 'Relation',
+    agent: 'Agent',
+  };
+  return map[entityType] || entityType;
+}
+
 export async function getPeriodicReports(): Promise<PeriodicReport[]> {
-  try {
-    const { data, error } = await supabase
-      .from('periodic_reports')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  } catch {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
-    return [];
-  }
+  const { data, error } = await supabase
+    .from('periodic_reports')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
 }
 
-// Get single report
 export async function getPeriodicReport(id: string): Promise<PeriodicReport | null> {
-  try {
-    const { data, error } = await supabase
-      .from('periodic_reports')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-    if (error) throw error;
-    return data;
-  } catch {
-    const reports = await getPeriodicReports();
-    return reports.find(r => r.id === id) || null;
-  }
+  const { data, error } = await supabase
+    .from('periodic_reports')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
 }
 
-// Generate report content
-export async function generateReportContent(dateFrom: string, dateTo: string): Promise<ReportContent> {
-  // Get all organizations
-  const { data: orgs } = await supabase
-    .from('organizations')
-    .select('id, name, category')
-    .eq('status', 'active');
+export async function deletePeriodicReport(id: string): Promise<void> {
+  const { error } = await supabase.from('periodic_reports').delete().eq('id', id);
+  if (error) throw error;
+}
 
-  const organizations: ReportContent['organizations'] = [];
+export async function generateReportContent(
+  reportKind: string,
+  dateFrom: string,
+  dateTo: string,
+  subjectMatricule?: string,
+  subjectOrgId?: string
+): Promise<ReportContent> {
+  const fromIso = new Date(dateFrom + 'T00:00:00').toISOString();
+  const toIso = new Date(dateTo + 'T23:59:59').toISOString();
 
-  for (const org of orgs || []) {
-    // Get crime journal for this org
-    const storageKey = `${CRIME_JOURNAL_PREFIX}${org.id}`;
-    let entries: { id: string; crime_type: string; date: string; report: string | null; created_at: string }[] = [];
+  let query = supabase
+    .from('audit_log')
+    .select('id, action, action_label, entity_type, entity_id, entity_name, agent_matricule, agent_codename, created_at')
+    .gte('created_at', fromIso)
+    .lte('created_at', toIso)
+    .order('created_at', { ascending: true });
 
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) entries = JSON.parse(stored);
-    } catch {}
-
-    // Filter by date range
-    const filtered = entries.filter(e => {
-      const entryDate = new Date(e.date);
-      return entryDate >= new Date(dateFrom) && entryDate <= new Date(dateTo);
-    });
-
-    if (filtered.length === 0) continue;
-
-    // Aggregate crimes
-    const crimeCounts: Record<string, { count: number; latest_date: string }> = {};
-    for (const entry of filtered) {
-      if (!crimeCounts[entry.crime_type]) {
-        crimeCounts[entry.crime_type] = { count: 0, latest_date: entry.date };
-      }
-      crimeCounts[entry.crime_type].count++;
-      if (new Date(entry.date) > new Date(crimeCounts[entry.crime_type].latest_date)) {
-        crimeCounts[entry.crime_type].latest_date = entry.date;
-      }
-    }
-
-    const crimes = Object.entries(crimeCounts).map(([crime_type, data]) => ({
-      crime_type,
-      count: data.count,
-      latest_date: data.latest_date,
-    }));
-
-    // Timeline
-    const timeline = filtered
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-      .map(e => ({ date: e.date, crime_type: e.crime_type, report: e.report }));
-
-    organizations.push({
-      id: org.id,
-      name: org.name,
-      category: org.category,
-      total_entries: filtered.length,
-      crimes,
-      timeline,
-    });
+  if (reportKind === 'agent' && subjectMatricule) {
+    query = query.eq('agent_matricule', subjectMatricule);
   }
 
-  // Summary
-  let totalCrimes = 0;
-  const crimeTypeCounts: Record<string, number> = {};
-  const orgCounts: Record<string, number> = {};
+  const { data: logs, error } = await query;
+  if (error) throw error;
 
-  for (const org of organizations) {
-    totalCrimes += org.total_entries;
-    orgCounts[org.name] = org.total_entries;
-    for (const crime of org.crimes) {
-      crimeTypeCounts[crime.crime_type] = (crimeTypeCounts[crime.crime_type] || 0) + crime.count;
-    }
+  let actions = (logs || []).map((row: Record<string, unknown>) => ({
+    id: String(row.id),
+    action: String(row.action),
+    action_label: (row.action_label as string) || mapActionLabel(String(row.action)),
+    entity_type: String(row.entity_type),
+    entity_name: (row.entity_name as string) || null,
+    created_at: String(row.created_at),
+  }));
+
+  let subjectName: string | null = null;
+  let subjectMat: string | null = subjectMatricule || null;
+
+  if (reportKind === 'organization' && subjectOrgId) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('name')
+      .eq('id', subjectOrgId)
+      .maybeSingle();
+    subjectName = org?.name || null;
+    actions = actions.filter(
+      (a) => a.entity_type === 'organizations' && a.entity_name?.includes(subjectName || '___')
+    );
+  } else if (reportKind === 'agent' && subjectMatricule) {
+    const { data: agent } = await supabase
+      .from('agents')
+      .select('code_name, display_name')
+      .ilike('matricule', subjectMatricule)
+      .maybeSingle();
+    subjectName = agent?.code_name || agent?.display_name || null;
   }
 
-  const topCrimes = Object.entries(crimeTypeCounts)
-    .map(([type, count]) => ({ type, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  const byActionMap: Record<string, { action: string; label: string; count: number }> = {};
+  const byEntityMap: Record<string, { entity_type: string; count: number }> = {};
 
-  const mostActive = Object.entries(orgCounts)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+  for (const a of actions) {
+    const key = a.action;
+    if (!byActionMap[key]) {
+      byActionMap[key] = { action: key, label: mapActionLabel(key), count: 0 };
+    }
+    byActionMap[key].count++;
+
+    const ek = a.entity_type;
+    if (!byEntityMap[ek]) {
+      byEntityMap[ek] = { entity_type: ek, count: 0 };
+    }
+    byEntityMap[ek].count++;
+  }
 
   return {
+    report_kind: reportKind,
     period_start: dateFrom,
     period_end: dateTo,
     generated_at: new Date().toISOString(),
-    organizations,
+    subject_name: subjectName,
+    subject_matricule: subjectMat,
+    actions,
     summary: {
-      total_organizations: organizations.length,
-      total_crimes: totalCrimes,
-      top_crimes: topCrimes,
-      most_active_organizations: mostActive,
+      total_actions: actions.length,
+      by_action: Object.values(byActionMap).sort((a, b) => b.count - a.count),
+      by_entity: Object.values(byEntityMap).sort((a, b) => b.count - a.count),
     },
   };
 }
 
-// Create and save report
 export async function createPeriodicReport(
-  reportType: string,
+  reportKind: string,
   dateFrom: string,
-  dateTo: string
+  dateTo: string,
+  subjectMatricule?: string,
+  subjectOrgId?: string
 ): Promise<PeriodicReport> {
-  const session = getSessionInfo();
-  const content = await generateReportContent(dateFrom, dateTo);
+  const { matricule } = getAuthorshipSession();
+  const content = await generateReportContent(reportKind, dateFrom, dateTo, subjectMatricule, subjectOrgId);
 
   const report = {
-    report_type: reportType,
+    report_type: reportKind,
     date_from: dateFrom,
     date_to: dateTo,
     content: content as unknown as Record<string, unknown>,
-    generated_by: session.matricule,
+    generated_by: matricule,
   };
 
-  try {
-    const { data, error } = await supabase
-      .from('periodic_reports')
-      .insert(stampCreate(report as Record<string, unknown>))
-      .select('*')
-      .single();
-    if (error) throw error;
-    return data;
-  } catch {
-    const reports = await getPeriodicReports();
-    const newReport: PeriodicReport = {
-      id: `report-${Date.now()}`,
-      ...report,
-      created_at: new Date().toISOString(),
-    };
-    reports.unshift(newReport);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
-    return newReport;
-  }
+  const { data, error } = await supabase
+    .from('periodic_reports')
+    .insert(stampCreate(report as Record<string, unknown>))
+    .select('*')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-// Delete report
-export async function deletePeriodicReport(id: string): Promise<void> {
-  try {
-    const { error } = await supabase.from('periodic_reports').delete().eq('id', id);
-    if (error) throw error;
-  } catch {
-    const reports = await getPeriodicReports();
-    const filtered = reports.filter(r => r.id !== id);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  }
-}
-
-// Export report as HTML
 export function exportReportAsHtml(report: PeriodicReport): void {
-  const content = report.content as ReportContent;
+  const content = report.content as unknown as ReportContent;
+  const subjectLine = content.subject_name
+    ? `${content.subject_name}${content.subject_matricule ? ` (${content.subject_matricule})` : ''}`
+    : 'Tous les agents';
+
+  const actionsHtml = content.actions
+    .map((a) => {
+      const date = new Date(a.created_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+      const ent = entityLabel(a.entity_type);
+      return `<tr><td>${date}</td><td>${a.action_label}</td><td>${ent}</td><td>${a.entity_name || ''}</td></tr>`;
+    })
+    .join('');
+
+  const summaryByAction = content.summary.by_action
+    .map((s) => `<tr><td>${s.label}</td><td>${s.count}</td></tr>`)
+    .join('');
+
+  const summaryByEntity = content.summary.by_entity
+    .map((s) => `<tr><td>${entityLabel(s.entity_type)}</td><td>${s.count}</td></tr>`)
+    .join('');
 
   const html = `<!DOCTYPE html>
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Rapport ${report.report_type} - DOA</title>
+  <title>Rapport DOA - ${subjectLine}</title>
   <style>
     body { font-family: 'Segoe UI', Arial, sans-serif; max-width: 900px; margin: 0 auto; padding: 40px; background: #fff; color: #1a1a1a; }
     h1 { font-size: 24px; border-bottom: 2px solid #0e7490; padding-bottom: 10px; margin-bottom: 30px; }
     h2 { font-size: 16px; color: #0e7490; margin-top: 30px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-    .section { margin-bottom: 25px; padding: 20px; background: #f8fafc; border-left: 4px solid #0e7490; }
-    .org { margin-bottom: 20px; padding: 15px; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; }
-    .org-name { font-weight: bold; font-size: 16px; margin-bottom: 8px; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; margin-right: 4px; }
-    .count { background: #dbeafe; color: #1e40af; }
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; }
+    th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
     th { background: #f1f5f9; font-weight: 600; }
     .header { text-align: center; margin-bottom: 40px; }
     .header .logo { font-size: 28px; font-weight: bold; color: #0e7490; }
@@ -267,44 +319,25 @@ export function exportReportAsHtml(report: PeriodicReport): void {
 <body>
   <div class="header">
     <div class="logo">DOA - Drug Observation Agency</div>
-    <div class="subtitle">Rapport ${report.report_type.charAt(0).toUpperCase() + report.report_type.slice(1)}</div>
+    <div class="subtitle">Rapport d'activité</div>
   </div>
 
   <h1>Rapport du ${new Date(content.period_start).toLocaleDateString('fr-FR')} au ${new Date(content.period_end).toLocaleDateString('fr-FR')}</h1>
 
-  <h2>Synthèse</h2>
-  <div class="section">
-    <table>
-      <tr><th>Organisations analysées</th><td>${content.summary.total_organizations}</td></tr>
-      <tr><th>Total infractions</th><td>${content.summary.total_crimes}</td></tr>
-    </table>
+  <h2>Sujet</h2>
+  <table>
+    <tr><th>Sujet</th><td>${subjectLine}</td></tr>
+    <tr><th>Total actions</th><td>${content.summary.total_actions}</td></tr>
+  </table>
 
-    <h3 style="margin-top: 15px;">Top infractions</h3>
-    <table>
-      <tr><th>Type</th><th>Nombre</th></tr>
-      ${content.summary.top_crimes.map(c => `<tr><td>${c.type}</td><td>${c.count}</td></tr>`).join('')}
-    </table>
+  <h2>Répartition par type d'action</h2>
+  <table><tr><th>Action</th><th>Nombre</th></tr>${summaryByAction}</table>
 
-    <h3 style="margin-top: 15px;">Organisations les plus actives</h3>
-    <table>
-      <tr><th>Organisation</th><th>Infractions</th></tr>
-      ${content.summary.most_active_organizations.map(o => `<tr><td>${o.name}</td><td>${o.count}</td></tr>`).join('')}
-    </table>
-  </div>
+  <h2>Répartition par type de ressource</h2>
+  <table><tr><th>Ressource</th><th>Nombre</th></tr>${summaryByEntity}</table>
 
-  <h2>Détail par organisation</h2>
-  ${content.organizations.map(org => `
-    <div class="org">
-      <div class="org-name">${org.name}</div>
-      <p><span class="badge count">${org.total_entries} infractions</span></p>
-      ${org.crimes.length > 0 ? `
-        <table>
-          <tr><th>Infraction</th><th>Nombre</th><th>Dernière date</th></tr>
-          ${org.crimes.map(c => `<tr><td>${c.crime_type}</td><td>${c.count}</td><td>${new Date(c.latest_date).toLocaleDateString('fr-FR')}</td></tr>`).join('')}
-        </table>
-      ` : ''}
-    </div>
-  `).join('')}
+  <h2>Détail des actions</h2>
+  <table><tr><th>Date</th><th>Action</th><th>Type</th><th>Détail</th></tr>${actionsHtml}</table>
 
   <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; text-align: center; font-size: 12px; color: #94a3b8;">
     Document généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')} - DOA Registre
@@ -320,5 +353,5 @@ export function exportReportAsHtml(report: PeriodicReport): void {
 }
 
 export function getReportTypeLabel(type: string): string {
-  return REPORT_TYPES.find(t => t.value === type)?.label || type;
+  return REPORT_TYPES.find((t) => t.value === type)?.label || type;
 }

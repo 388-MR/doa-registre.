@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileText, Plus, Loader2, Trash2, Save, X, Edit3, Image, Video, Search } from 'lucide-react';
 import { Lightbox } from '../components/ui/Lightbox';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import {
   getLocalNotes,
   createLocalNote,
@@ -176,6 +177,7 @@ export function NotesPage() {
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
+                  <AuthorFooter createdAt={note.created_at} updatedAt={note.updated_at} />
                 </div>
               );
             })

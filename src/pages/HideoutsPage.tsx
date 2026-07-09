@@ -6,6 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Badge, StatusBadge } from '../components/ui/Badge';
 import { LoadingState, EmptyState } from '../components/ui/Empty';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { getHideouts } from '../services/organizations';
 import { getOrganizations } from '../services/organizations';
 import { canEdit } from '../services/auth';
@@ -137,6 +138,7 @@ export function HideoutsPage() {
                   )}
                 </div>
               </div>
+              <AuthorFooter createdAt={h.created_at} createdMatricule={h.created_by_matricule} createdCodename={h.created_by_codename} updatedAt={h.updated_at} updatedMatricule={h.updated_by_matricule} updatedCodename={h.updated_by_codename} />
             </Card>
           ))}
         </div>

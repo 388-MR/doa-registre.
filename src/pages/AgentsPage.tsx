@@ -63,7 +63,7 @@ export function AgentsPage() {
     setEditing(a);
     setEditForm({
       code_name: a.code_name || '',
-      role: a.role === 'admin' ? 'commandant_doa' : 'agent_doa',
+      role: a.role === 'admin' ? 'commandant_doa' : (a.doa_role || 'agent_doa'),
       is_read_only: a.is_read_only ?? false,
     });
   };
@@ -162,12 +162,13 @@ export function AgentsPage() {
               <label className="block text-xs text-gray-600 mb-1">Rôle DOA</label>
               <select
                 value={editForm.role}
-                onChange={e => setEditForm(f => ({ ...f, role: e.target.value as 'agent_doa' | 'commandant_doa' }))}
+                onChange={e => setEditForm(f => ({ ...f, role: e.target.value as 'agent_doa' | 'commandant_doa' | 'super_admin' }))}
                 disabled={!isSuperAdmin && editForm.role === 'commandant_doa'}
                 className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-cyan-700 disabled:opacity-50"
               >
                 <option value="agent_doa">Agent DOA</option>
                 <option value="commandant_doa">Commandant DOA</option>
+                {isSuperAdmin && <option value="super_admin">Super Admin</option>}
               </select>
               {!isSuperAdmin && editForm.role === 'commandant_doa' && (
                 <p className="text-[10px] text-gray-600 mt-1">Seul le super admin peut modifier les commandants.</p>
@@ -215,7 +216,7 @@ export function AgentsPage() {
 
 function AgentCard({ agent, onEdit }: { agent: AgentRow; onEdit: () => void }) {
   const online = isOnline(agent.last_seen);
-  const isCmd = agent.role === 'admin' || agent.role === 'lead';
+  const isCmd = agent.role === 'admin' || agent.role === 'lead' || agent.doa_role === 'commandant_doa' || agent.doa_role === 'super_admin';
 
   return (
     <button
