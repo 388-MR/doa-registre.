@@ -2,10 +2,15 @@
 import supabase from '../lib/supabase';
 
 export const RELATION_TYPES = [
-  { value: 'alliee', label: 'Alliée', color: '#22c55e' },
-  { value: 'ennemie', label: 'Ennemie', color: '#ef4444' },
+  { value: 'allie', label: 'Allié', color: '#22c55e' },
+  { value: 'ennemi', label: 'Ennemi', color: '#ef4444' },
+  { value: 'partenaire_commercial', label: 'Partenaire commercial', color: '#3b82f6' },
+  { value: 'fournisseur', label: 'Fournisseur', color: '#8b5cf6' },
+  { value: 'client', label: 'Client', color: '#06b6d4' },
   { value: 'neutre', label: 'Neutre', color: '#6b7280' },
-  { value: 'inconnu', label: 'Inconnu', color: '#f59e0b' },
+  { value: 'sous_controle', label: 'Sous contrôle', color: '#eab308' },
+  { value: 'rival', label: 'Rival', color: '#f97316' },
+  { value: 'inconnu', label: 'Inconnu', color: '#9ca3af' },
 ] as const;
 
 export interface OrganizationRelation {

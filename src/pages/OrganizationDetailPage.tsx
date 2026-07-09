@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Edit, Trash2, Plus, Save, Users, Car, Briefcase,
+  ArrowLeft, Edit, Edit2, Trash2, Plus, Save, Users, Car, Briefcase,
   Shield, MapPin, Home, Gavel, Camera, Loader2, AlertTriangle, X,
   FileText, CalendarDays, Image, Video, ExternalLink, Download,
   FolderOpen, BookMarked,
 } from 'lucide-react';
-import { getOrganization, getMembers, getVehicles, getHeadquarters, getHideouts,
+import { getOrganization, getOrganizations, getMembers, getVehicles, getHeadquarters, getHideouts,
   getBusinesses, getTerritories, deleteOrganization } from '../services/organizations';
 import supabase from '../lib/supabase';
 import type { Organization, Member, Vehicle, Headquarters, Hideout, Business, Territory } from '../types';
@@ -1944,7 +1944,9 @@ function RelationsTab({ org }: { org: Organization }) {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ organization_id: '', relation_type: 'neutre', notes: '' });
+  const [editFormData, setEditFormData] = useState({ relation_type: 'neutre', notes: '' });
   const { isReadOnly } = usePermissions();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
 
@@ -1955,9 +1957,15 @@ function RelationsTab({ org }: { org: Organization }) {
 
   const loadRelations = async () => {
     setLoading(true);
-    const data = await getOrganizationRelations(org.id);
-    setRelations(data);
-    setLoading(false);
+    try {
+      const data = await getOrganizationRelations(org.id);
+      setRelations(data);
+    } catch (error) {
+      console.error('Failed to load relations:', error);
+      setRelations([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAdd = async () => {
@@ -1982,6 +1990,29 @@ function RelationsTab({ org }: { org: Organization }) {
     }
   };
 
+  const handleEditSave = async (rel: OrganizationRelation) => {
+    setSaving(true);
+    try {
+      await updateRelation(rel.id, {
+        relation_type: editFormData.relation_type,
+        notes: editFormData.notes || undefined,
+      });
+      logUpdate('organization_relations', rel.id, 'Relation', { relation_type: rel.relation_type }, { relation_type: editFormData.relation_type });
+      setEditingId(null);
+      await loadRelations();
+    } catch (error) {
+      console.error('Failed to update relation:', error);
+      alert('Erreur lors de la modification: ' + (error as any)?.message || 'Erreur inconnue');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const startEdit = (rel: OrganizationRelation) => {
+    setEditingId(rel.id);
+    setEditFormData({ relation_type: rel.relation_type, notes: rel.notes || '' });
+  };
+
   const handleDelete = async (rel: OrganizationRelation) => {
     if (!confirm('Supprimer cette relation ?')) return;
     try {
@@ -1994,7 +2025,6 @@ function RelationsTab({ org }: { org: Organization }) {
     }
   };
 
-  // Get the other organization in the relation
   const getOtherOrg = (rel: OrganizationRelation) => {
     return rel.organization_a_id === org.id ? rel.organization_b : rel.organization_a;
   };
@@ -2076,38 +2106,92 @@ function RelationsTab({ org }: { org: Organization }) {
           {relations.map(rel => {
             const otherOrg = getOtherOrg(rel);
             const relColor = getRelationTypeColor(rel.relation_type);
+            const isEditing = editingId === rel.id;
             return (
               <div key={rel.id} className="rounded-xl border border-gray-800/50 bg-gray-900/20 p-4 group">
-                <div className="flex items-center gap-4">
-                  <div
-                    className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold"
-                    style={{ background: otherOrg?.color || '#4d6fa8' }}
-                  >
-                    {(otherOrg?.name || '?').slice(0, 2).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-200">{otherOrg?.name || 'Organisation inconnue'}</div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
-                        style={{ background: `${relColor}20`, color: relColor }}
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-200 mb-2">
+                      Modifier la relation avec {otherOrg?.name || 'Organisation inconnue'}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Type de relation</label>
+                      <select
+                        value={editFormData.relation_type}
+                        onChange={e => setEditFormData(f => ({ ...f, relation_type: e.target.value }))}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100"
                       >
-                        {getRelationTypeLabel(rel.relation_type)}
-                      </span>
-                      {rel.notes && (
-                        <span className="text-xs text-gray-500 truncate">{rel.notes}</span>
-                      )}
+                        {RELATION_TYPES.map(t => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Notes (optionnel)</label>
+                      <textarea
+                        value={editFormData.notes}
+                        onChange={e => setEditFormData(f => ({ ...f, notes: e.target.value }))}
+                        rows={2}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 placeholder-gray-600"
+                        placeholder="Contexte de la relation..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditSave(rel)}
+                        disabled={saving}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-cyan-800 hover:bg-cyan-700 text-white rounded-lg text-sm transition-colors disabled:opacity-50"
+                      >
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                        Enregistrer
+                      </button>
+                      <button onClick={() => setEditingId(null)} className="px-3 py-2 text-gray-500 hover:text-gray-300 text-sm">
+                        Annuler
+                      </button>
                     </div>
                   </div>
-                  {!isReadOnly && (
-                    <button
-                      onClick={() => handleDelete(rel)}
-                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all"
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                      style={{ background: otherOrg?.color || '#4d6fa8' }}
                     >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+                      {(otherOrg?.name || '?').slice(0, 2).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-gray-200">{otherOrg?.name || 'Organisation inconnue'}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium"
+                          style={{ background: `${relColor}20`, color: relColor }}
+                        >
+                          {getRelationTypeLabel(rel.relation_type)}
+                        </span>
+                        {rel.notes && (
+                          <span className="text-xs text-gray-500 truncate">{rel.notes}</span>
+                        )}
+                      </div>
+                    </div>
+                    {!isReadOnly && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={() => startEdit(rel)}
+                          className="text-gray-600 hover:text-cyan-400 transition-all"
+                          title="Modifier"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(rel)}
+                          className="text-gray-600 hover:text-red-400 transition-all"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
