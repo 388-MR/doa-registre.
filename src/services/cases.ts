@@ -1,4 +1,5 @@
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 import type { Case, CaseInput, CaseMember, CaseOrganization, Evidence, EvidenceInput, Arrest, ArrestInput, Surveillance, SurveillanceInput } from '../types';
 
 // =====================================================
@@ -45,7 +46,7 @@ export async function getCase(id: string): Promise<Case | null> {
 export async function createCase(input: CaseInput): Promise<Case> {
   const { data, error } = await supabase
     .from('cases')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -56,7 +57,7 @@ export async function createCase(input: CaseInput): Promise<Case> {
 export async function updateCase(id: string, input: Partial<CaseInput & { closed_at?: string }>): Promise<Case> {
   const { data, error } = await supabase
     .from('cases')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();
@@ -155,7 +156,7 @@ export async function getEvidence(caseId?: string): Promise<Evidence[]> {
 export async function createEvidence(input: EvidenceInput): Promise<Evidence> {
   const { data, error } = await supabase
     .from('evidence')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -199,7 +200,7 @@ export async function getArrests(memberId?: string): Promise<Arrest[]> {
 export async function createArrest(input: ArrestInput): Promise<Arrest> {
   const { data, error } = await supabase
     .from('arrests')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -234,7 +235,7 @@ export async function getSurveillance(status?: string): Promise<Surveillance[]> 
 export async function createSurveillance(input: SurveillanceInput): Promise<Surveillance> {
   const { data, error } = await supabase
     .from('surveillance')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -245,7 +246,7 @@ export async function createSurveillance(input: SurveillanceInput): Promise<Surv
 export async function updateSurveillance(id: string, input: Partial<SurveillanceInput>): Promise<Surveillance> {
   const { data, error } = await supabase
     .from('surveillance')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();

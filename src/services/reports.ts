@@ -1,5 +1,6 @@
 // Periodic Reports Service
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 import { getOrganization } from './organizations';
 
 export const REPORT_TYPES = [
@@ -206,7 +207,7 @@ export async function createPeriodicReport(
   try {
     const { data, error } = await supabase
       .from('periodic_reports')
-      .insert(report)
+      .insert(stampCreate(report as Record<string, unknown>))
       .select('*')
       .single();
     if (error) throw error;

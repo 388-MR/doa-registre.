@@ -68,6 +68,10 @@ export interface Organization {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Computed/aggregated fields (optional)
   member_count?: number;
   vehicle_count?: number;
@@ -96,6 +100,10 @@ export interface Member {
   danger_level: number;
   created_at: string;
   updated_at: string;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   organization?: Organization | null;
 }
@@ -136,6 +144,10 @@ export interface Vehicle {
   status: VehicleStatus;
   created_at: string;
   updated_at: string;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   owner?: Member | null;
   organization?: Organization | null;
@@ -150,6 +162,10 @@ export interface Headquarters {
   status: LocationStatus;
   created_at: string;
   updated_at: string;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   organization?: Organization;
 }
@@ -165,6 +181,10 @@ export interface Hideout {
   status: LocationStatus;
   created_at: string;
   updated_at: string;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   organization?: Organization | null;
 }
@@ -226,6 +246,10 @@ export interface Case {
   created_at: string;
   updated_at: string;
   closed_at: string | null;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   lead_agent?: Profile | null;
   members?: CaseMember[];
@@ -264,6 +288,11 @@ export interface Evidence {
   author_id: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+  updated_at?: string | null;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   case?: Case | null;
   author?: Profile | null;
@@ -337,6 +366,11 @@ export interface Arrest {
   judicial_outcome: string | null;
   notes: string | null;
   created_at: string;
+  updated_at?: string | null;
+  created_by_matricule?: string | null;
+  created_by_codename?: string | null;
+  updated_by_matricule?: string | null;
+  updated_by_codename?: string | null;
   // Relations
   member?: Member;
   arresting_agent?: Profile | null;

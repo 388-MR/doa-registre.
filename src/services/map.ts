@@ -1,5 +1,6 @@
 // Map Points Service - Interactive map points of interest
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 
 export const MAP_POINT_TYPES = [
   { value: 'qg', label: 'QG', emoji: '🏠', defaultColor: '#4d6fa8' },
@@ -105,7 +106,7 @@ export async function createMapPoint(input: MapPointInput): Promise<MapPoint> {
   try {
     const { data, error } = await supabase
       .from('map_points')
-      .insert(point)
+      .insert(stampCreate(point as Record<string, unknown>))
       .select('*, organization:organizations(id, name, color)')
       .single();
     if (error) throw error;
@@ -129,7 +130,7 @@ export async function updateMapPoint(id: string, input: Partial<MapPointInput>):
   try {
     const { data, error } = await supabase
       .from('map_points')
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update(stampUpdate(input as Record<string, unknown>))
       .eq('id', id)
       .select('*, organization:organizations(id, name, color)')
       .single();

@@ -1,4 +1,5 @@
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 import type { Organization, OrganizationInput, Member, Vehicle, Headquarters, Hideout, Business, Territory, Weapon, Financing, OrganizationAlliance } from '../types';
 
 // =====================================================
@@ -45,7 +46,7 @@ export async function getOrganization(id: string): Promise<Organization | null> 
 export async function createOrganization(input: OrganizationInput): Promise<Organization> {
   const { data, error } = await supabase
     .from('organizations')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -56,7 +57,7 @@ export async function createOrganization(input: OrganizationInput): Promise<Orga
 export async function updateOrganization(id: string, input: Partial<OrganizationInput>): Promise<Organization> {
   const { data, error } = await supabase
     .from('organizations')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();
@@ -125,7 +126,7 @@ export async function getMember(id: string): Promise<Member | null> {
 export async function createMember(input: MemberInput): Promise<Member> {
   const { data, error } = await supabase
     .from('members')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -136,7 +137,7 @@ export async function createMember(input: MemberInput): Promise<Member> {
 export async function updateMember(id: string, input: Partial<MemberInput>): Promise<Member> {
   const { data, error } = await supabase
     .from('members')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();
@@ -187,7 +188,7 @@ export async function getVehicles(organizationId?: string): Promise<Vehicle[]> {
 export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
   const { data, error } = await supabase
     .from('vehicles')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -198,7 +199,7 @@ export async function createVehicle(input: VehicleInput): Promise<Vehicle> {
 export async function updateVehicle(id: string, input: Partial<VehicleInput>): Promise<Vehicle> {
   const { data, error } = await supabase
     .from('vehicles')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();
@@ -233,7 +234,7 @@ export async function getHeadquarters(organizationId: string): Promise<Headquart
 export async function createHeadquarters(input: HeadquartersInput): Promise<Headquarters> {
   const { data, error } = await supabase
     .from('headquarters')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -263,7 +264,7 @@ export async function getHideouts(organizationId?: string): Promise<Hideout[]> {
 export async function createHideout(input: HideoutInput): Promise<Hideout> {
   const { data, error } = await supabase
     .from('hideouts')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -293,7 +294,7 @@ export async function getBusinesses(organizationId?: string): Promise<Business[]
 export async function createBusiness(input: BusinessInput): Promise<Business> {
   const { data, error } = await supabase
     .from('businesses')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -318,7 +319,7 @@ export async function getTerritories(organizationId: string): Promise<Territory[
 export async function createTerritory(input: TerritoryInput): Promise<Territory> {
   const { data, error } = await supabase
     .from('territories')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -348,7 +349,7 @@ export async function getWeapons(organizationId?: string): Promise<Weapon[]> {
 export async function createWeapon(input: WeaponInput): Promise<Weapon> {
   const { data, error } = await supabase
     .from('weapons')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -387,7 +388,7 @@ export async function getAlliances(organizationId: string): Promise<Organization
 export async function createAlliance(input: { organization_a_id: string; organization_b_id: string; relation_type?: string; description?: string; history?: string }): Promise<OrganizationAlliance> {
   const { data, error } = await supabase
     .from('organization_alliances')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 

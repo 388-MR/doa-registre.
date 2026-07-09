@@ -1,5 +1,6 @@
 // Plantation Surveillance Service
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 
 export const PLANTATION_STATUSES = [
   { value: 'reperee', label: 'Repérée', color: '#f59e0b' },
@@ -116,7 +117,7 @@ export async function createPlantation(input: PlantationInput): Promise<Plantati
   try {
     const { data: result, error } = await supabase
       .from('plantations')
-      .insert(data)
+      .insert(stampCreate(data as Record<string, unknown>))
       .select('*')
       .single();
     if (error) throw error;
@@ -140,7 +141,7 @@ export async function updatePlantation(id: string, input: Partial<PlantationInpu
   try {
     const { data, error } = await supabase
       .from('plantations')
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update(stampUpdate({ ...input, updated_at: new Date().toISOString() } as Record<string, unknown>))
       .eq('id', id)
       .select('*')
       .single();
@@ -218,7 +219,7 @@ export async function addPlantationEntry(plantationId: string, input: { photos?:
   try {
     const { data, error } = await supabase
       .from('plantation_entries')
-      .insert(entry)
+      .insert(stampCreate(entry as Record<string, unknown>))
       .select('*')
       .single();
     if (error) throw error;

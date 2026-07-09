@@ -20,6 +20,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/Tabs'
 import { Avatar } from '../components/ui/Avatar';
 import { LoadingState, EmptyState } from '../components/ui/Empty';
 import { ConfirmModal } from '../components/ui/Modal';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { getMember, deleteMember, getOrganizationStats, getOrganization } from '../services/organizations';
 import { getPersonRelations, type PersonRelation } from '../services/misc';
 import { getArrests } from '../services/cases';
@@ -286,6 +287,8 @@ export function MemberDetailPage() {
         confirmLabel="Supprimer"
         variant="danger"
       />
+
+      <AuthorFooter createdAt={member.created_at} createdMatricule={member.created_by_matricule} createdCodename={member.created_by_codename} updatedAt={member.updated_at} updatedMatricule={member.updated_by_matricule} updatedCodename={member.updated_by_codename} />
     </div>
   );
 }

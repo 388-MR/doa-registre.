@@ -15,6 +15,7 @@ import { usePermissions } from '../hooks/usePermissions';
 import { EvidenceEditor } from '../components/evidence/EvidenceEditor';
 import type { ContentBlock } from '../components/evidence/EvidenceEditor';
 import { Lightbox } from '../components/ui/Lightbox';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 import { CRIME_TYPES, getCrimeLabel } from '../services/crimes';
 import { logCreate, logUpdate, logDelete, logExport } from '../services/logger';
 import {
@@ -540,6 +541,8 @@ export function OrganizationDetailPage() {
           setLightbox={setLightbox}
         />
       )}
+
+      <AuthorFooter createdAt={org.created_at} createdMatricule={org.created_by_matricule} createdCodename={org.created_by_codename} updatedAt={org.updated_at} updatedMatricule={org.updated_by_matricule} updatedCodename={org.updated_by_codename} />
     </div>
   );
 }

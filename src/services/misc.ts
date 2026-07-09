@@ -1,4 +1,5 @@
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 import type { Informant, InformantInput, Member, Organization, Vehicle, Case, Tag, EntityTag, Favorite, Note, Draft, Notification, PersonRelation } from '../types';
 
 // =====================================================
@@ -39,7 +40,7 @@ export async function getInformant(id: string): Promise<Informant | null> {
 export async function createInformant(input: InformantInput): Promise<Informant> {
   const { data, error } = await supabase
     .from('informants')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -50,7 +51,7 @@ export async function createInformant(input: InformantInput): Promise<Informant>
 export async function updateInformant(id: string, input: Partial<InformantInput>): Promise<Informant> {
   const { data, error } = await supabase
     .from('informants')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();
@@ -85,7 +86,7 @@ export async function getPersonRelations(memberId: string): Promise<PersonRelati
 export async function createPersonRelation(input: { person_a_id: string; person_b_id: string; relation_type?: string; description?: string; is_mutual?: boolean }): Promise<PersonRelation> {
   const { data, error } = await supabase
     .from('person_relations')
-    .insert(input)
+    .insert(stampCreate(input as Record<string, unknown>))
     .select()
     .single();
 
@@ -249,7 +250,7 @@ export async function createNote(userId: string, title: string, content: string,
 export async function updateNote(id: string, input: Partial<{ title: string; content: string; is_shared: boolean }>): Promise<Note> {
   const { data, error } = await supabase
     .from('notes')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();
@@ -300,7 +301,7 @@ export async function createDraft(userId: string, title: string, content: string
 export async function updateDraft(id: string, input: Partial<{ title: string; content: string }>): Promise<Draft> {
   const { data, error } = await supabase
     .from('drafts')
-    .update({ ...input, updated_at: new Date().toISOString() })
+    .update(stampUpdate(input as Record<string, unknown>))
     .eq('id', id)
     .select()
     .single();

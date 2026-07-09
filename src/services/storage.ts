@@ -4,6 +4,7 @@
 // Notes/Drafts/Testimonials: localStorage-backed.
 
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 
 function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -150,7 +151,7 @@ export async function createLocalInformant(input: Omit<LocalInformant, 'id' | 'c
   try {
     const { data, error } = await supabase
       .from('informants')
-      .insert({
+      .insert(stampCreate({
         photo_url: input.photo_url,
         first_name: input.first_name,
         last_name: input.last_name,
@@ -158,7 +159,7 @@ export async function createLocalInformant(input: Omit<LocalInformant, 'id' | 'c
         notes: encodeNotes(input),
         reliability_status: input.reliability_status || 'inconnu',
         status: 'active',
-      })
+      } as Record<string, unknown>))
       .select('*')
       .single();
     if (error) throw error;
@@ -182,7 +183,7 @@ export async function updateLocalInformant(id: string, patch: Partial<Omit<Local
     const { data: existing } = await supabase.from('informants').select('notes').eq('id', id).maybeSingle();
     const { data, error } = await supabase
       .from('informants')
-      .update({
+      .update(stampUpdate({
         photo_url: patch.photo_url,
         first_name: patch.first_name,
         last_name: patch.last_name,
@@ -190,7 +191,7 @@ export async function updateLocalInformant(id: string, patch: Partial<Omit<Local
         notes: encodeNotes(patch, existing?.notes ?? null),
         reliability_status: patch.reliability_status || 'inconnu',
         updated_at: new Date().toISOString(),
-      })
+      } as Record<string, unknown>))
       .eq('id', id)
       .select('*')
       .single();

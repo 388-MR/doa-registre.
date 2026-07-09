@@ -1,5 +1,6 @@
 // Organization Relations Service
 import supabase from '../lib/supabase';
+import { stampCreate, stampUpdate } from '../lib/authorship';
 
 export const RELATION_TYPES = [
   { value: 'allie', label: 'Allié', color: '#22c55e' },
@@ -94,11 +95,11 @@ export async function createRelation(input: RelationInput): Promise<Organization
       // Update the existing relation instead of creating a duplicate
       const { data, error } = await supabase
         .from('organization_relations')
-        .update({
+        .update(stampUpdate({
           relation_type: input.relation_type,
           notes: input.notes || null,
           updated_at: new Date().toISOString(),
-        })
+        } as Record<string, unknown>))
         .eq('id', existing.id)
         .select(`
           *,
@@ -112,12 +113,12 @@ export async function createRelation(input: RelationInput): Promise<Organization
 
     const { data, error } = await supabase
       .from('organization_relations')
-      .insert({
+      .insert(stampCreate({
         organization_a_id: orgA,
         organization_b_id: orgB,
         relation_type: input.relation_type,
         notes: input.notes || null,
-      })
+      } as Record<string, unknown>))
       .select(`
         *,
         organization_a:organizations!organization_a_id(id, name, color, logo_url),
@@ -160,7 +161,7 @@ export async function updateRelation(id: string, input: Partial<RelationInput>):
   try {
     const { data, error } = await supabase
       .from('organization_relations')
-      .update({ ...input, updated_at: new Date().toISOString() })
+      .update(stampUpdate({ ...input, updated_at: new Date().toISOString() } as Record<string, unknown>))
       .eq('id', id)
       .select(`
         *,

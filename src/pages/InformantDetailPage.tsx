@@ -18,6 +18,7 @@ import {
 import { usePermissions } from '../hooks/usePermissions';
 import { useAuth } from '../contexts/AuthContext';
 import { AuthorTag } from '../components/ui/AuthorTag';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 
 const RELIABILITY_COLORS: Record<string, string> = {
   fiable: '#22c55e',
@@ -407,6 +408,8 @@ export function InformantDetailPage() {
           </div>
         </div>
       )}
+
+      <AuthorFooter createdAt={informant.created_at} createdMatricule={informant.created_by_matricule} createdCodename={informant.created_by_codename} updatedAt={informant.updated_at} updatedMatricule={informant.updated_by_matricule} updatedCodename={informant.updated_by_codename} />
     </div>
   );
 }

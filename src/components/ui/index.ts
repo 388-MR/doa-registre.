@@ -7,3 +7,4 @@ export * from './Avatar';
 export * from './Empty';
 export * from './Tabs';
 export * from './Dropdown';
+export * from './AuthorFooter';

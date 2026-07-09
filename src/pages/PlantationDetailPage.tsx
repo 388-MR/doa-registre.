@@ -9,6 +9,7 @@ import {
 } from '../services/plantations';
 import { logUpdate, logDelete, logCreate } from '../services/logger';
 import { Lightbox } from '../components/ui/Lightbox';
+import { AuthorFooter } from '../components/ui/AuthorFooter';
 
 export function PlantationDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -442,6 +443,8 @@ export function PlantationDetailPage() {
       {lightbox && (
         <Lightbox images={lightbox.imgs} initialIndex={lightbox.idx} onClose={() => setLightbox(null)} />
       )}
+
+      <AuthorFooter createdAt={plantation.created_at} createdMatricule={plantation.created_by_matricule} createdCodename={plantation.created_by_codename} updatedAt={plantation.updated_at} updatedMatricule={plantation.updated_by_matricule} updatedCodename={plantation.updated_by_codename} />
     </div>
   );
 }
